@@ -1,5 +1,14 @@
 pandas
 numpy
 scikit-learn
-# sentence-transformers
-# torch
+python-dotenv
+langchain
+langchain-community
+pypdf
+openai
+chromadb
+tiktoken
+langchain-community
+fastapi
+langchain-openai
+uvicorn
