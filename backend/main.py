@@ -5,70 +5,61 @@ from pdf_rag import query_rag_pdf
 from sql.sql_search import query_rag_sql
 from langchain_community.chat_models import ChatOpenAI
 
-
 app = FastAPI()
-
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000","http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
 class QueryInput(BaseModel):
     query: str
-
 
 @app.post("/query")
 async def get_responses(data: QueryInput):
     query = data.query
 
-
     try:
-        # Get PDF-based and SQL-based responses
         pdf_response = query_rag_pdf(query)
         sql_response = query_rag_sql(query)
 
+        def clean_response_content(content):
+            cleaned = content.strip()
+            while cleaned.startswith(('.', ' ', '\n', '\t', '*', '-')):
+                cleaned = cleaned[1:].strip()
+            return cleaned
 
-        # Combine them into one prompt
-        combined_prompt = f"""
-        You are a helpful assistant. Below are two responses retrieved from different sources for the same user query.
+        cleaned_pdf_content = clean_response_content(pdf_response)
 
-
-        Response from PDF-based documentation:
-        {pdf_response.content if hasattr(pdf_response, "content") else pdf_response}
-
-
-        Response from previously resolved SQL tickets:
-        {sql_response}
-
-
-        Please merge and rewrite these into a single, clear, concise, and helpful answer for the user.
-        """
-
-
-        model = ChatOpenAI()
-        final_response = model.invoke(combined_prompt)
-
-
-        # Optional logging for debugging
         print("###########PDF RESPONSE###########")
-        print(pdf_response.content if hasattr(pdf_response, "content") else pdf_response)
-        print("###########SQL RESPONSE###########")
-        print(sql_response)
-        print("###########FINAL RESPONSE###########")
-        print(final_response.content)
+        print(cleaned_pdf_content)
 
+        print("###########SQL RESPONSE###########")
+        if sql_response:
+            print("\n\n---\n\n".join(sql_response))
+        else:
+            print("No results found.")
+
+        print("###########FINAL RESPONSE###########")
+        if not sql_response or (len(sql_response) == 1 and sql_response[0].startswith("Error executing SQL:")):
+            final_result = f"No solution found in previous tickets. Using documentation response:\n{cleaned_pdf_content}"
+        else:
+            first_result = sql_response[0]
+            solution_text = None
+            for line in first_result.split('\n'):
+                if line.lower().startswith('solution:'):
+                    solution_text = line[len('solution:'):].strip()
+                    break
+            final_result = solution_text if solution_text else first_result
 
         return {
-            "pdf_response": pdf_response.content if hasattr(pdf_response, "content") else pdf_response,
+            "pdf_response": cleaned_pdf_content,
             "sql_response": sql_response,
-            "final_response": final_response.content
+            "final_response": final_result
         }
-
 
     except Exception as e:
         return {
@@ -76,7 +67,6 @@ async def get_responses(data: QueryInput):
             "sql_response": f"Error: {str(e)}",
             "final_response": f"Sorry, an error occurred: {str(e)}"
         }
-
 
 @app.get("/")
 async def root():
