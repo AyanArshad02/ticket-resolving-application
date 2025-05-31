@@ -1,121 +1,122 @@
-import React, { useState } from "react";
+import React, { useState } from 'react';
+import axios from 'axios';
 
+export default function TicketSearchUI() {
+  const [searchMode, setSearchMode] = useState('text');
+  const [query, setQuery] = useState('');
+  const [result, setResult] = useState(null);
 
-function App() {
-  const [query, setQuery] = useState("");
-  const [responses, setResponses] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-
-    if (!query.trim()) {
-      setError("Please enter a query.");
-      return;
-    }
-
-
-    setError("");
-    setLoading(true);
-    setResponses(null);
-
-
+  const handleSearch = async () => {
     try {
-      const res = await fetch("http://localhost:8000/query", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ query }),
+      const res = await axios.post('http://127.0.0.1:8000/query', {
+        query: query
       });
-
-
-      if (!res.ok) {
-        throw new Error(`Server error: ${res.status}`);
-      }
-
-
-      const data = await res.json();
-      setResponses(data);
+      setResult(res.data);
     } catch (err) {
-      setError(`Failed to get response: ${err.message}`);
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
-
+  
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">
-            🎯 Support Ticket Resolution System
-          </h1>
+    <div className="h-screen flex flex-col">
+      <header className="bg-blue-700 text-white text-xl font-semibold p-4">
+        PTS Resolution Enhancement System
+      </header>
 
+      <div className="flex flex-1">
+        {/* Left Sidebar */}
+        <div className="w-1/4 bg-gray-100 p-4 space-y-4">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSearchMode('text')}
+              className={`p-2 flex-1 rounded ${searchMode === 'text' ? 'bg-blue-600 text-white' : 'bg-white border'}`}
+            >
+              Search by Text
+            </button>
+            <button
+              onClick={() => setSearchMode('ticket')}
+              className={`p-2 flex-1 rounded ${searchMode === 'ticket' ? 'bg-blue-600 text-white' : 'bg-white border'}`}
+            >
+              Search by Ticket #
+            </button>
+          </div>
 
-          <form onSubmit={handleSubmit} className="mb-6">
-            <div className="flex gap-4">
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Enter your support query..."
-                className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={loading}
-              />
-              <button
-                type="submit"
-                disabled={loading || !query.trim()}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                {loading ? "🔄 Processing..." : "Submit"}
-              </button>
+          <div className="flex items-center border rounded p-2">
+            <input
+              type="text"
+              placeholder="Describe the issue..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="flex-1 outline-none"
+            />
+            <button onClick={handleSearch} className="ml-2 text-blue-600">
+              🔍
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <div>
+              <label className="block text-sm font-semibold">Date Range</label>
+              <select className="w-full border p-2 rounded">
+                <option>Last 30 days</option>
+              </select>
             </div>
-          </form>
-
-
-          {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-              {error}
+            <div>
+              <label className="block text-sm font-semibold">Customer</label>
+              <input type="text" placeholder="Filter by customer" className="w-full border p-2 rounded" />
             </div>
-          )}
+            <div>
+              <label className="block text-sm font-semibold">Support Engineer</label>
+              <input type="text" placeholder="Filter by engineer" className="w-full border p-2 rounded" />
+            </div>
+          </div>
+        </div>
 
-
-          {responses && (
-            <div className="space-y-6">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-blue-800 mb-2">
-                  📄 Knowledge Base Response
-                </h3>
-                <p className="text-gray-700 whitespace-pre-wrap">
-                  {responses.pdf_response}
-                </p>
+        {/* Right Display Panel */}
+        <div className="flex-1 p-6 overflow-y-auto space-y-4">
+          {result ? (
+            <div className="space-y-4">
+              {/* PDF Response */}
+              <div className="bg-white p-4 shadow rounded">
+                <h2 className="font-bold text-lg mb-2">PDF Response</h2>
+                <p>{result.pdf_response}</p>
               </div>
 
-
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-green-800 mb-2">
-                  🗃️ Historical Tickets Response
-                </h3>
-                <p className="text-gray-700 whitespace-pre-wrap">
-                  {responses.sql_response}
-                </p>
+              {/* SQL Response (Scrollable Table) */}
+              <div className="bg-white p-4 shadow rounded">
+                <h2 className="font-bold text-lg mb-2">SQL Response</h2>
+                <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                  <table className="table-auto w-full border">
+                    <thead>
+                      <tr>
+                        {Object.keys(result.sql_response[0] || {}).map((key) => (
+                          <th key={key} className="px-4 py-2 border-b bg-gray-100 text-left">{key}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {result.sql_response.map((row, idx) => (
+                        <tr key={idx}>
+                          {Object.values(row).map((val, i) => (
+                            <td key={i} className="px-4 py-2 border-b">{val}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
-
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-purple-800 mb-2">
-                  🧠 Final Combined Solution
-                </h3>
-                <p className="text-gray-700 whitespace-pre-wrap">
-                  {responses.final_response}
-                </p>
+              {/* Final Response */}
+              <div className="bg-white p-4 shadow rounded">
+                <h2 className="font-bold text-lg mb-2">Final Response</h2>
+                <p>{result.final_response}</p>
               </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full text-gray-500">
+              Select a ticket from the search results to view details
             </div>
           )}
         </div>
@@ -123,7 +124,3 @@ function App() {
     </div>
   );
 }
-
-
-export default App;
-
